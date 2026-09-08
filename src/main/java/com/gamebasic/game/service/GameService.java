@@ -1,9 +1,6 @@
 package com.gamebasic.game.service;
 
-import com.gamebasic.game.dto.CreateRequest;
-import com.gamebasic.game.dto.GameDetailResponse;
-import com.gamebasic.game.dto.GameSummaryResponse;
-import com.gamebasic.game.dto.ProgressRequest;
+import com.gamebasic.game.dto.*;
 import com.gamebasic.game.entity.Game;
 import com.gamebasic.game.repository.GameRepository;
 import com.gamebasic.runcard.dto.CardResponse;
@@ -22,12 +19,12 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class GameService {
 
     private final GameRepository gameRepository;
     private final RunCardRepository runCardRepository;
 
-    @Transactional
     public GameDetailResponse createGame(CreateRequest request) {
         Game game = gameRepository.save(new Game(request.getPlayerName()));
         saveDeck(game, request.getDeck());
@@ -37,13 +34,13 @@ public class GameService {
             deck.add(new CardResponse(card.getId(), card.getCardType(), card.getAcquiredFloor()));
         }
         return new GameDetailResponse(
-            game.getId(),
-            game.getPlayerName(),
-            game.getCurrentHp(),
-            game.getCurrentFloor(),
-            game.getPhase(),
-            game.getStatus(),
-            deck
+                game.getId(),
+                game.getPlayerName(),
+                game.getCurrentHp(),
+                game.getCurrentFloor(),
+                game.getPhase(),
+                game.getStatus(),
+                deck
         );
     }
 
@@ -57,17 +54,16 @@ public class GameService {
 
     private Game findGame(Long gameId) {
         return gameRepository.findById(gameId)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
-    @Transactional
     public GameDetailResponse updateProgress(Long gameId, ProgressRequest request) {
         Game game = findGame(gameId);
         game.updateProgress(
-            request.getCurrentHp(),
-            request.getCurrentFloor(),
-            request.getPhase(),
-            request.getStatus()
+                request.getCurrentHp(),
+                request.getCurrentFloor(),
+                request.getPhase(),
+                request.getStatus()
         );
         // 요청의 deck은 저장할 덱 전체이므로 기존 카드를 모두 지우고 요청 순서대로 다시 저장합니다.
         runCardRepository.deleteAllByGame(game);
@@ -78,13 +74,13 @@ public class GameService {
             deck.add(new CardResponse(card.getId(), card.getCardType(), card.getAcquiredFloor()));
         }
         return new GameDetailResponse(
-            game.getId(),
-            game.getPlayerName(),
-            game.getCurrentHp(),
-            game.getCurrentFloor(),
-            game.getPhase(),
-            game.getStatus(),
-            deck
+                game.getId(),
+                game.getPlayerName(),
+                game.getCurrentHp(),
+                game.getCurrentFloor(),
+                game.getPhase(),
+                game.getStatus(),
+                deck
         );
     }
 
@@ -105,25 +101,32 @@ public class GameService {
                 .collect(Collectors.toList());
     }
 
-     @Transactional(readOnly = true)
-     public GameDetailResponse getGame(Long gameId) {
+    @Transactional(readOnly = true)
+    public GameDetailResponse getGame(Long gameId) {
         Game game = findGame(gameId);
-         List<RunCard> cards = runCardRepository.findAllByGameOrderByIdAsc(game);
-         List<CardResponse> deck = new ArrayList<>();
-         for (RunCard card : cards) {
-             deck.add(new CardResponse(card.getId(), card.getCardType(), card.getAcquiredFloor()));
-         }
-         return new GameDetailResponse(
-                 game.getId(),
-                 game.getPlayerName(),
-                 game.getCurrentHp(),
-                 game.getCurrentFloor(),
-                 game.getPhase(),
-                 game.getStatus(),
-                 deck
-         );
-     }
+        List<RunCard> cards = runCardRepository.findAllByGameOrderByIdAsc(game);
+        List<CardResponse> deck = new ArrayList<>();
+        for (RunCard card : cards) {
+            deck.add(new CardResponse(card.getId(), card.getCardType(), card.getAcquiredFloor()));
+        }
+        return new GameDetailResponse(
+                game.getId(),
+                game.getPlayerName(),
+                game.getCurrentHp(),
+                game.getCurrentFloor(),
+                game.getPhase(),
+                game.getStatus(),
+                deck
+        );
+    }
 
-    // TODO (Lv 8): 플레이어 이름 변경 — 변경 감지로 수정
-    // TODO (Lv 8): 게임 삭제
+    public void renameGame(Long gameId, RenameRequest request) {
+        Game game = findGame(gameId);
+        game.rename(request.getPlayerName());
+    }
+
+    public void deleteGame(Long gameId) {
+        runCardRepository.deleteAllByGame(findGame(gameId));
+        gameRepository.deleteById(gameId);
+    }
 }
