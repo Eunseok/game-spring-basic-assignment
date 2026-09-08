@@ -19,12 +19,12 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class GameService {
 
     private final GameRepository gameRepository;
     private final RunCardRepository runCardRepository;
 
-    @Transactional
     public GameDetailResponse createGame(CreateRequest request) {
         Game game = gameRepository.save(new Game(request.getPlayerName()));
         saveDeck(game, request.getDeck());
@@ -57,7 +57,6 @@ public class GameService {
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
-    @Transactional
     public GameDetailResponse updateProgress(Long gameId, ProgressRequest request) {
         Game game = findGame(gameId);
         game.updateProgress(
@@ -121,7 +120,6 @@ public class GameService {
          );
      }
 
-    @Transactional
     public void renameGame(Long gameId, RenameRequest request) {
         Game game = findGame(gameId);
         game.rename(request.getPlayerName());
