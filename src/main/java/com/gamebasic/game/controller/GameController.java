@@ -29,6 +29,11 @@ public class GameController {
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
+    @GetMapping("/games/{gameId}")
+    public ResponseEntity<GameDetailResponse> getGame(@PathVariable Long gameId) {
+        return ResponseEntity.ok(gameService.getGame(gameId));
+    }
+
      @PutMapping("/games/{gameId}/progress")
      public ResponseEntity<?> updateProgress(
          @PathVariable Long gameId,
