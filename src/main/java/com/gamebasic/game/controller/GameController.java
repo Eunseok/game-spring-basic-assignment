@@ -32,7 +32,7 @@ public class GameController {
     }
 
      @PutMapping("/games/{gameId}/progress")
-     public ResponseEntity<?> updateProgress(
+     public ResponseEntity<GameDetailResponse> updateProgress(
          @PathVariable Long gameId,
          @Valid @RequestBody ProgressRequest request
      ) {
