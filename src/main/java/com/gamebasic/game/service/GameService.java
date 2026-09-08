@@ -88,9 +88,9 @@ public class GameService {
         );
     }
 
-     @Transactional(readOnly = true)
-     public List<GameSummaryResponse> getGames() {
-        return gameRepository.findAll().stream()
+    @Transactional(readOnly = true)
+    public List<GameSummaryResponse> getGames() {
+        return gameRepository.findAllGameByOrderByIdDesc().stream()
                 .map(game -> GameSummaryResponse.builder()
                         .id(game.getId())
                         .playerName(game.getPlayerName())
@@ -103,7 +103,7 @@ public class GameService {
                         .updateAt(game.getUpdateAt())
                         .build())
                 .collect(Collectors.toList());
-     }
+    }
 
      @Transactional(readOnly = true)
      public GameDetailResponse getGame(Long gameId) {
