@@ -6,6 +6,7 @@ import com.gamebasic.game.dto.*;
 import com.gamebasic.game.entity.Game;
 import com.gamebasic.game.repository.GameRepository;
 import com.gamebasic.runcard.dto.CardResponse;
+import com.gamebasic.runcard.dto.DeckCount;
 import com.gamebasic.runcard.dto.RunCardRequest;
 import com.gamebasic.runcard.entity.RunCard;
 import com.gamebasic.runcard.repository.RunCardRepository;
@@ -15,6 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -90,19 +93,32 @@ public class GameService {
 
     @Transactional(readOnly = true)
     public List<GameSummaryResponse> getGames() {
-        return gameRepository.findAllGameByOrderByIdDesc().stream()
-                .map(game -> GameSummaryResponse.builder()
+        // #1 Game 내림차순 조회
+        List<Game> games = gameRepository.findAllGameByOrderByIdDesc();
+
+        // #2 DeckCount 조회
+        List<DeckCount> deckCounts = runCardRepository.countByGames(games);
+
+        // #3 Mapping(Id, Game)
+        Map<Long, Game> gameMap = games.stream().collect(Collectors.toMap(Game::getId, Function.identity()));
+
+        // #4 응답 DTO 반환
+        return deckCounts.stream()
+                .map(deckCount -> {
+                    Game game = gameMap.get(deckCount.getGameId());
+                    return GameSummaryResponse.builder()
                         .id(game.getId())
                         .playerName(game.getPlayerName())
                         .currentFloor(game.getCurrentFloor())
                         .currentHp(game.getCurrentHp())
                         .phase(String.valueOf(game.getPhase()))
                         .status(String.valueOf(game.getStatus()))
-                        .deckSize(runCardRepository.findAllByGameOrderByIdAsc(game).size())
+                        .deckSize(deckCount.getDeckSize().intValue())
                         .createAt(game.getCreatedAt())
                         .updateAt(game.getUpdateAt())
-                        .build())
-                .collect(Collectors.toList());
+                        .build();
+                })
+                .toList();
     }
 
     @Transactional(readOnly = true)
