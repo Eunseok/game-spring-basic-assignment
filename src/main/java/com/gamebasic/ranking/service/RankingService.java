@@ -17,12 +17,6 @@ public class RankingService {
 
     private final RankingClient rankingClient;
 
-    private static final Set<String> VALID_CARD_TYPE_NAMES =
-            Arrays.stream(CardType.values())
-                    .map(Enum::name)
-                    .collect(Collectors.toSet());
-    private static final List<String> EXPECTED_BOSS_PHASES = List.of("THRONE", "UNBOUND", "ECLIPSE");
-
     public RankingResponse getRankings() {
         RankingSource rankingSource = rankingClient.fetch();
 
@@ -36,39 +30,33 @@ public class RankingService {
         List<RankingSource.RankingRecord> filteredRecords = new ArrayList<>();
 
         for (var record : records) {
+
             // 클리어시간 층당 30초 이상
-            if (record.run().durationSeconds() < record.run().clearedFloor() * 30) continue;
+            if (!hasValidDuration(record)) continue;
 
             // 남은 HP 1 이상 99 이하
-            int finalHp = record.run().finalHp();
-            if (finalHp < 1 || finalHp > 99) continue;
+            if (!hasValidFinalHp(record)) continue;
 
             // 덱 크기 9장 이상 20장 이하, 덱크기와 덱카드 갯수가 동일
-            if (record.deck() == null || record.deck().cards() == null) continue;
-            int cardCount = record.deck().cards().size();
-            if (cardCount < 9 || cardCount > 20 || cardCount != record.deck().size()) continue;
+            if (!hasValidDeckSize(record)) continue;
 
             // 모든 카드 타입이 유효한 타입인지
-            if (!record.deck().cards().stream().allMatch(c -> c.cardType() != null && VALID_CARD_TYPE_NAMES.contains(c.cardType()))) continue;
+            if (!hasValidCardType(record))
+                continue;
 
             // 모든 획득층 0 이상 9 이하
-            if (!record.deck().cards().stream().allMatch(c -> c.acquiredFloor() >= 0 && c.acquiredFloor() <= 9)) continue;
+            if (!hasValidAcquiredFloor(record))
+                continue;
 
             // 보스 페이즈 순서(THRONE -> UNBOUND -> ECLIPSE) 검증
-            if (record.bossFight() == null || record.bossFight().phases() == null) continue;
-            List<String> actualPhases = record.bossFight().phases().stream()
-                    .map(RankingSource.Phase::phase)
-                    .toList();
-            if (!EXPECTED_BOSS_PHASES.equals(actualPhases)) continue;
+            if (!hasValidBossPhaseOrder(record)) continue;
 
             // 각 페이즈 턴 1 이상, 턴 합계가 최종 턴과 일치
-            var phaseList = record.bossFight().phases();
-            if (!phaseList.stream().allMatch(p -> p.turns() >= 1)) continue;
-            int turnSum = phaseList.stream().mapToInt(RankingSource.Phase::turns).sum();
-            if (turnSum != record.bossFight().totalTurns()) continue;
+            if (!hasConsistentTurnCounts(record)) continue;
 
             // 마무리 카드가 실제 덱 카드 타입에 존재
-            if (record.deck().cards().stream().noneMatch(c -> record.bossFight().finishingCard().equals(c.cardType()))) continue;
+            if (!hasValidFinishingCard(record))
+                continue;
 
             filteredRecords.add(record);
         }
@@ -120,5 +108,56 @@ public class RankingService {
             ));
         }
         return entries;
+    }
+
+    //----------------------- 검증 규칙 ------------------------------
+    private static boolean hasValidDuration(RankingSource.RankingRecord r) {
+        return r.run().durationSeconds() >= r.run().clearedFloor() * 30;
+    }
+
+    private static boolean hasValidFinalHp(RankingSource.RankingRecord r) {
+        return r.run().finalHp() >= 1 && r.run().finalHp() <= 99;
+    }
+
+    private static boolean hasValidDeckSize(RankingSource.RankingRecord r) {
+        var deck = r.deck();
+        if (deck == null || deck.cards() == null) return false;
+        int cardCount = deck.cards().size();
+        return cardCount >= 9 && cardCount <= 20 && deck.size() == cardCount;
+    }
+
+    private static final Set<String> VALID_CARD_TYPE_NAMES = Arrays.stream(CardType.values()).map(Enum::name).collect(Collectors.toSet());
+    private static boolean hasValidCardType(RankingSource.RankingRecord r) {
+        return r.deck().cards().stream().allMatch(
+                c -> c.cardType() != null && VALID_CARD_TYPE_NAMES.contains(c.cardType())
+        );
+    }
+
+    private static boolean hasValidAcquiredFloor(RankingSource.RankingRecord r) {
+        return r.deck().cards().stream().allMatch(
+                c -> c.acquiredFloor() >= 0 && c.acquiredFloor() <= 9
+        );
+    }
+
+    private static final List<String> EXPECTED_BOSS_PHASES = List.of("THRONE", "UNBOUND", "ECLIPSE");
+    private static boolean hasValidBossPhaseOrder(RankingSource.RankingRecord r) {
+        var bossFight = r.bossFight();
+        if(bossFight == null || bossFight.phases() == null) return false;
+        List<String> actualPhases = bossFight.phases().stream()
+                .map(RankingSource.Phase::phase).toList();
+        return EXPECTED_BOSS_PHASES.equals(actualPhases);
+    }
+
+    private static boolean hasConsistentTurnCounts(RankingSource.RankingRecord r) {
+        var phases = r.bossFight().phases();
+        if (!phases.stream().allMatch(p -> p.turns() >= 1)) return false;
+        int totalTurns = phases.stream().mapToInt(RankingSource.Phase::turns).sum();
+        return totalTurns == r.bossFight().totalTurns();
+    }
+
+    private static boolean hasValidFinishingCard(RankingSource.RankingRecord r) {
+        String finishingCard = r.bossFight().finishingCard();
+        return r.deck().cards().stream()
+                .anyMatch(c -> c.cardType().equals(finishingCard));
     }
 }
