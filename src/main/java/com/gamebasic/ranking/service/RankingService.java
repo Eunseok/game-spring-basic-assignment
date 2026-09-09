@@ -9,6 +9,7 @@ import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 @Service
@@ -27,40 +28,9 @@ public class RankingService {
                 .toList();
 
         // 2. 정상 기록 검증 및 필터링, 제외한 수 기록(excludedCount)
-        List<RankingSource.RankingRecord> filteredRecords = new ArrayList<>();
-
-        for (var record : records) {
-
-            // 클리어시간 층당 30초 이상
-            if (!hasValidDuration(record)) continue;
-
-            // 남은 HP 1 이상 99 이하
-            if (!hasValidFinalHp(record)) continue;
-
-            // 덱 크기 9장 이상 20장 이하, 덱크기와 덱카드 갯수가 동일
-            if (!hasValidDeckSize(record)) continue;
-
-            // 모든 카드 타입이 유효한 타입인지
-            if (!hasValidCardType(record))
-                continue;
-
-            // 모든 획득층 0 이상 9 이하
-            if (!hasValidAcquiredFloor(record))
-                continue;
-
-            // 보스 페이즈 순서(THRONE -> UNBOUND -> ECLIPSE) 검증
-            if (!hasValidBossPhaseOrder(record)) continue;
-
-            // 각 페이즈 턴 1 이상, 턴 합계가 최종 턴과 일치
-            if (!hasConsistentTurnCounts(record)) continue;
-
-            // 마무리 카드가 실제 덱 카드 타입에 존재
-            if (!hasValidFinishingCard(record))
-                continue;
-
-            filteredRecords.add(record);
-        }
-
+        List<RankingSource.RankingRecord> filteredRecords = records.stream()
+                .filter(RankingService::isValidRecord)
+                .collect(Collectors.toList());
         int excludedCount = records.size() - filteredRecords.size();
 
         // 3. 정렬 , order by 경과시간 ASC, 최종 체력 DESC, ID ASC
@@ -110,7 +80,28 @@ public class RankingService {
         return entries;
     }
 
-    //----------------------- 검증 규칙 ------------------------------
+    // 랭킹 검증 델리게이트
+    private static final List<Predicate<RankingSource.RankingRecord>> BASIC_RULES = List.of(
+            RankingService::hasValidDuration,
+            RankingService::hasValidFinalHp,
+            RankingService::hasValidDeckSize   // null 체크 포함, 이후 규칙의 전제 조건
+    );
+
+    private static final List<Predicate<RankingSource.RankingRecord>> DECK_DEPENDENT_RULES = List.of(
+            RankingService::hasValidCardTypes,
+            RankingService::hasValidAcquiredFloors,
+            RankingService::hasValidBossPhaseOrder,
+            RankingService::hasConsistentTurnCounts,
+            RankingService::hasValidFinishingCard
+    );
+
+    private static boolean isValidRecord(RankingSource.RankingRecord r) {
+        return BASIC_RULES.stream().allMatch(rule -> rule.test(r))
+                && DECK_DEPENDENT_RULES.stream().allMatch(rule -> rule.test(r));
+    }
+
+    //----------------------- 정상 기록 검증 규칙 ------------------------------
+
     private static boolean hasValidDuration(RankingSource.RankingRecord r) {
         return r.run().durationSeconds() >= r.run().clearedFloor() * 30;
     }
@@ -127,13 +118,13 @@ public class RankingService {
     }
 
     private static final Set<String> VALID_CARD_TYPE_NAMES = Arrays.stream(CardType.values()).map(Enum::name).collect(Collectors.toSet());
-    private static boolean hasValidCardType(RankingSource.RankingRecord r) {
+    private static boolean hasValidCardTypes(RankingSource.RankingRecord r) {
         return r.deck().cards().stream().allMatch(
                 c -> c.cardType() != null && VALID_CARD_TYPE_NAMES.contains(c.cardType())
         );
     }
 
-    private static boolean hasValidAcquiredFloor(RankingSource.RankingRecord r) {
+    private static boolean hasValidAcquiredFloors(RankingSource.RankingRecord r) {
         return r.deck().cards().stream().allMatch(
                 c -> c.acquiredFloor() >= 0 && c.acquiredFloor() <= 9
         );
