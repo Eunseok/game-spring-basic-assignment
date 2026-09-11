@@ -1,5 +1,6 @@
 package com.gamebasic.game;
 
+import com.gamebasic.game.dto.GameDetailResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -11,6 +12,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
@@ -18,6 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -171,9 +174,9 @@ class GameApiTests {
     void getGames_success() throws Exception {
         // Given
         mockMvc.perform(
-                post("/games")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(createRequestJson("heroA", List.of(card("STRIKE", 0))))
+                        post("/games")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(createRequestJson("heroA", List.of(card("STRIKE", 0))))
                 )
                 .andExpect(status().isCreated());
         mockMvc.perform(
@@ -199,5 +202,45 @@ class GameApiTests {
         mockMvc.perform(get("/games"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(0)));
+    }
+
+    // ------------------------------------------------------------
+    // GET /games/{id} - 게임 상세 조회
+    // ------------------------------------------------------------
+
+    @Test
+    @DisplayName("생성한 게임을 id로 조회할 수 있다")
+    void getGame_success() throws Exception {
+        String requestJson = createRequestJson(
+                "hero", List.of(card("STRIKE", 1), card("GUARD", 1))
+        );
+
+        MvcResult result = mockMvc.perform(post("/games")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        GameDetailResponse response = objectMapper.readValue(
+                result.getResponse().getContentAsString(),
+                GameDetailResponse.class
+        );
+
+        Long gameId = response.getId();
+
+        mockMvc.perform(get("/games/{gameId}", gameId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(gameId))
+                .andExpect(jsonPath("$.playerName").value("hero"))
+                .andExpect(jsonPath("$.deck", hasSize(2)));
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 게임을 조회하면 404를 반환한다")
+    void getGame_notFound() throws Exception {
+        mockMvc.perform(get("/games/{gameId}", 999L))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.message", containsString("999")));
     }
 }
