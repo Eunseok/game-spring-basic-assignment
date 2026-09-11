@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -73,6 +74,12 @@ class GameApiTests {
         );
 
         return response.getId();
+    }
+
+    private String renameRequestJson(String playerName) throws Exception {
+        Map<String, Object> map = new HashMap<>();
+        map.put("playerName", playerName); 
+        return objectMapper.writeValueAsString(map);
     }
 
     // ------------------------------------------------------------
@@ -245,5 +252,57 @@ class GameApiTests {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.message", containsString("999")));
+    }
+
+    // ------------------------------------------------------------
+    // PATCH /games/{id} - 플레이어 이름 변경
+    // ------------------------------------------------------------
+
+    @Test
+    @DisplayName("이름을 변경하면 204를 반환하고 이후 조회 시 반영되어 있다")
+    void renamePlayerName_success() throws Exception {
+        Long gameId = createGameAndGetId();
+        String requestJson;
+
+        requestJson = """
+                {
+                    "playerName": "newName"
+                }
+                """;
+        mockMvc.perform(
+                        patch("/games/{gameId}", gameId)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(requestJson)
+                )
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/games/{gameId}", gameId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.playerName").value("newName"));
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", "a", "abcdefghijklmn"})
+    @DisplayName("플레이어 이름이 2~12자를 벗어나면 400을 반환한다")
+    void renamePlayerName_validationFail_invalidPlayerName(String playerName) throws Exception {
+        Long gameId = createGameAndGetId();
+
+        mockMvc.perform(
+                        patch("/games/{gameId}", gameId)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(renameRequestJson(playerName))
+                )
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 게임의 이름을 변경하면 404를 반환한다")
+    void renameGame_notFound() throws Exception {
+        mockMvc.perform(patch("/games/{gameId}", 999L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(renameRequestJson("newName")))
+                .andExpect(status().isNotFound());
     }
 }
