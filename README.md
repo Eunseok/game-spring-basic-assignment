@@ -6,7 +6,7 @@
 >
 > 본 README는 **배포를 목적으로 작성된 문서가 아니며**, 과제 제출 및 튜터 평가를 위해 구현 내용과 설계 의도를 정리한 문서입니다.
 
-- 원본(포크 대상) 게임 데모(정적 배포판, 필수 기능만 확인 가능): https://nhahan.github.io/crimson-citadel/
+- 원본(포크 대상) 게임 데모: https://nhahan.github.io/crimson-citadel/
 - API 명세: https://f-api.github.io/game-spring-api-docs/basic/api-docs.html
 
 ## 과제 개요
