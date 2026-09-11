@@ -14,6 +14,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -31,30 +35,44 @@ class GameApiTests {
     @Autowired
     private ObjectMapper objectMapper;
 
+    // ------------------------------------------------------------
+    // 헬퍼 메서드
+    // ------------------------------------------------------------
+
+    private Map<String, Object> card(String cardType, int acquiredFloor) {
+        Map<String, Object> card = new LinkedHashMap<>();
+        card.put("cardType", cardType);
+        card.put("acquiredFloor", acquiredFloor);
+        return card;
+    }
+
+    private String createRequestJson(String playerName, List<Map<String, Object>> deck) throws Exception {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("playerName", playerName);
+        body.put("deck", deck);
+        return objectMapper.writeValueAsString(body);
+    }
+
+    // ------------------------------------------------------------
+    // POST /games - 게임 생성
+    // ------------------------------------------------------------
+
     @Test
     @DisplayName("게임을 생성하면 초기 상태와 덱이 저장되어 201로 반환된다")
     void createGame_success() throws Exception {
         // 초기 상태 currentHp=99, currentFloor=1, phase=REWARD, status=PLAYING
-        String requestJson = """
-                {
-                  "playerName": "hero",
-                  "deck": [
-                    {
-                      "cardType": "STRIKE",
-                      "acquiredFloor": 0
-                    },
-                    {
-                      "cardType": "GUARD",
-                      "acquiredFloor": 0
-                    }
-                  ]
-                }
-                """;
+        String requestJson = createRequestJson(
+                "hero",
+                List.of(
+                        card("STRIKE", 0),
+                        card("GUARD", 0)
+                )
+        );
 
         mockMvc.perform(
-                post("/games")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(requestJson)
+                        post("/games")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(requestJson)
                 )
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").exists())
@@ -75,23 +93,13 @@ class GameApiTests {
     @ValueSource(strings = {"", "a", "abcdefghijklmn"})
     @DisplayName("플레이어 이름이 2~12자를 벗어나면 400을 반환한다")
     void createGame_validationFail_invalidPlayerName(String playerName) throws Exception {
-        String playerNameJson = objectMapper.writeValueAsString(playerName);
-
-        String requestJson = """
-                {
-                  "playerName": %s,
-                  "deck": [
-                    {
-                      "cardType": "STRIKE",
-                      "acquiredFloor": 0
-                    },
-                    {
-                      "cardType": "GUARD",
-                      "acquiredFloor": 0
-                    }
-                  ]
-                }
-                """.formatted(playerNameJson);
+        String requestJson = createRequestJson(
+                playerName,
+                List.of(
+                        card("STRIKE", 0),
+                        card("GUARD", 0)
+                )
+        );
 
         mockMvc.perform(
                         post("/games")
@@ -105,12 +113,7 @@ class GameApiTests {
     @Test
     @DisplayName("덱 리스트가 비어있으면 400을 반환한다")
     void createGame_validationFail_emptyDeck() throws Exception {
-        String requestJson = """
-                {
-                  "playerName": "hero",
-                  "deck": []
-                }
-                """;
+        String requestJson = createRequestJson("hero", List.of());
 
         mockMvc.perform(
                         post("/games")
@@ -125,17 +128,10 @@ class GameApiTests {
     @ValueSource(ints = {-1, 11})
     @DisplayName("카드 획득 층이 0~10층을 벗어나면 400을 반환한다")
     void createGame_validationFail_invalidCardFloor(int acquiredFloor) throws Exception {
-        String requestJson = """
-                {
-                  "playerName": "hero",
-                  "deck": [
-                    {
-                      "cardType": "STRIKE",
-                      "acquiredFloor": %s
-                    }
-                  ]
-                }
-                """.formatted(acquiredFloor);
+        String requestJson = createRequestJson(
+                "hero",
+                List.of(card("STRIKE", acquiredFloor))
+        );
 
         mockMvc.perform(
                         post("/games")
@@ -151,19 +147,10 @@ class GameApiTests {
     @ValueSource(strings = {"", " "})
     @DisplayName("카드 타입이 null이거나 비어있으면 400을 반환한다")
     void createGame_validationFail_invalidCardType(String cardType) throws Exception {
-        String cardTypeJson = objectMapper.writeValueAsString(cardType);
-
-        String requestJson = """
-                {
-                  "playerName": "hero",
-                  "deck": [
-                    {
-                      "cardType": %s,
-                      "acquiredFloor": 0
-                    }
-                  ]
-                }
-                """.formatted(cardTypeJson);
+        String requestJson = createRequestJson(
+                "hero",
+                List.of(card(cardType, 0))
+        );
 
         mockMvc.perform(
                         post("/games")
