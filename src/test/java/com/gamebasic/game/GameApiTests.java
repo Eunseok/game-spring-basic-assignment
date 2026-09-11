@@ -2,6 +2,9 @@ package com.gamebasic.game;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -65,5 +68,37 @@ class GameApiTests {
                 .andExpect(jsonPath("$.deck[0].acquiredFloor").value(0))
                 .andExpect(jsonPath("$.deck[1].cardType").value("GUARD"))
                 .andExpect(jsonPath("$.deck[1].acquiredFloor").value(0));
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", "a", "abcdefghijklmn"})
+    @DisplayName("플레이어 이름이 2~12자를 벗어나면 400을 반환한다")
+    void createGame_validationFail_invalidPlayerName(String playerName) throws Exception {
+        String playerNameJson = objectMapper.writeValueAsString(playerName);
+
+        String requestJson = """
+                {
+                  "playerName": %s,
+                  "deck": [
+                    {
+                      "cardType": "STRIKE",
+                      "acquiredFloor": 0
+                    },
+                    {
+                      "cardType": "GUARD",
+                      "acquiredFloor": 0
+                    }
+                  ]
+                }
+                """.formatted(playerNameJson);
+
+        mockMvc.perform(
+                        post("/games")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(requestJson)
+                )
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").exists());
     }
 }
