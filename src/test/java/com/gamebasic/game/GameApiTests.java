@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.hamcrest.Matchers.hasSize;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -159,5 +160,44 @@ class GameApiTests {
                 )
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").exists());
+    }
+
+    // ------------------------------------------------------------
+    // GET /games  - 게임 목록 조회
+    // ------------------------------------------------------------
+
+    @Test
+    @DisplayName("저장된 모든 게임을 ID 내림차순으로 반환한다")
+    void getGames_success() throws Exception {
+        // Given
+        mockMvc.perform(
+                post("/games")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createRequestJson("heroA", List.of(card("STRIKE", 0))))
+                )
+                .andExpect(status().isCreated());
+        mockMvc.perform(
+                        post("/games")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(createRequestJson("heroB", List.of(card("STRIKE", 0), card("GUARD", 0))))
+                )
+                .andExpect(status().isCreated());
+
+        // When & Then
+        mockMvc.perform(get("/games"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].playerName").value("heroB"))
+                .andExpect(jsonPath("$[0].deckSize").value(2))
+                .andExpect(jsonPath("$[1].playerName").value("heroA"))
+                .andExpect(jsonPath("$[1].deckSize").value(1));
+    }
+
+    @Test
+    @DisplayName("게임이 하나도 없으면 빈 목록을 반환한다")
+    void getGames_empty() throws Exception {
+        mockMvc.perform(get("/games"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
     }
 }
