@@ -22,8 +22,7 @@ import java.util.Map;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -55,6 +54,25 @@ class GameApiTests {
         body.put("playerName", playerName);
         body.put("deck", deck);
         return objectMapper.writeValueAsString(body);
+    }
+
+    private Long createGameAndGetId() throws Exception {
+        String requestJson = createRequestJson(
+                "hero", List.of(card("STRIKE", 1), card("GUARD", 1))
+        );
+
+        MvcResult result = mockMvc.perform(post("/games")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        GameDetailResponse response = objectMapper.readValue(
+                result.getResponse().getContentAsString(),
+                GameDetailResponse.class
+        );
+
+        return response.getId();
     }
 
     // ------------------------------------------------------------
@@ -211,22 +229,7 @@ class GameApiTests {
     @Test
     @DisplayName("생성한 게임을 id로 조회할 수 있다")
     void getGame_success() throws Exception {
-        String requestJson = createRequestJson(
-                "hero", List.of(card("STRIKE", 1), card("GUARD", 1))
-        );
-
-        MvcResult result = mockMvc.perform(post("/games")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestJson))
-                .andExpect(status().isCreated())
-                .andReturn();
-
-        GameDetailResponse response = objectMapper.readValue(
-                result.getResponse().getContentAsString(),
-                GameDetailResponse.class
-        );
-
-        Long gameId = response.getId();
+        Long gameId = createGameAndGetId();
 
         mockMvc.perform(get("/games/{gameId}", gameId))
                 .andExpect(status().isOk())
