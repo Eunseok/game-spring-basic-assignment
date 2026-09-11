@@ -82,6 +82,20 @@ class GameApiTests {
         return objectMapper.writeValueAsString(map);
     }
 
+    private String progressRequestJson(
+            int currentHp, int currentFloor,
+            String phase, String status,
+            List<Map<String, Object>> deck
+    ) throws Exception {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("currentHp", currentHp);
+        body.put("currentFloor", currentFloor);
+        body.put("phase", phase);
+        body.put("status", status);
+        body.put("deck", deck);
+        return objectMapper.writeValueAsString(body);
+    }
+
     // ------------------------------------------------------------
     // POST /games - 게임 생성
     // ------------------------------------------------------------
@@ -329,4 +343,35 @@ class GameApiTests {
                 .andExpect(status().isNotFound());
     }
 
+    // ------------------------------------------------------------
+    // PUT /games/{id}/progress - 진행과 전체 덱 저장
+    // ------------------------------------------------------------
+
+    @Test
+    @DisplayName("진행 상황을 업데이트하면 hp/층/단계/상태와 덱이 요청대로 갱신된다")
+    void updateProgress_success() throws Exception {
+        Long gameId = createGameAndGetId();
+
+        String requestJson = progressRequestJson(
+                50, 3, "BATTLE", "PLAYING", List.of(card("HEAVY_BLOW", 3))
+        );
+
+        mockMvc.perform(put("/games/{gameId}/progress", gameId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(gameId))
+                .andExpect(jsonPath("$.currentHp").value(50))
+                .andExpect(jsonPath("$.currentFloor").value(3))
+                .andExpect(jsonPath("$.phase").value("BATTLE"))
+                .andExpect(jsonPath("$.status").value("PLAYING"))
+                .andExpect(jsonPath("$.deck", hasSize(1)))
+                .andExpect(jsonPath("$.deck[0].cardType").value("HEAVY_BLOW"));
+
+        // 재조회해도 갱신된 내용이 유지되어야 한다
+        mockMvc.perform(get("/games/{gameId}", gameId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentHp").value(50))
+                .andExpect(jsonPath("$.deck", hasSize(1)));
+    }
 }
