@@ -346,14 +346,14 @@ class GameApiTests {
     // ------------------------------------------------------------
     // PUT /games/{id}/progress - 진행과 전체 덱 저장
     // ------------------------------------------------------------
-
     @Test
-    @DisplayName("진행 상황을 업데이트하면 hp/층/단계/상태와 덱이 요청대로 갱신된다")
+    @DisplayName("HP, 층, 단계, 상태와 전체 덱을 저장한다. deck은 추가할 카드가 아니라 저장할 덱 전체다.")
     void updateProgress_success() throws Exception {
         Long gameId = createGameAndGetId();
 
+
         String requestJson = progressRequestJson(
-                50, 3, "BATTLE", "PLAYING", List.of(card("HEAVY_BLOW", 3))
+                50, 3, "BATTLE", "PLAYING", List.of(card("HEAVY_BLOW", 3), card("STRIKE", 1))
         );
 
         mockMvc.perform(put("/games/{gameId}/progress", gameId)
@@ -365,13 +365,52 @@ class GameApiTests {
                 .andExpect(jsonPath("$.currentFloor").value(3))
                 .andExpect(jsonPath("$.phase").value("BATTLE"))
                 .andExpect(jsonPath("$.status").value("PLAYING"))
-                .andExpect(jsonPath("$.deck", hasSize(1)))
-                .andExpect(jsonPath("$.deck[0].cardType").value("HEAVY_BLOW"));
+                .andExpect(jsonPath("$.deck", hasSize(2)))
+                .andExpect(jsonPath("$.deck[0].cardType").value("HEAVY_BLOW"))
+                .andExpect(jsonPath("$.deck[1].cardType").value("STRIKE"));
 
         // 재조회해도 갱신된 내용이 유지되어야 한다
         mockMvc.perform(get("/games/{gameId}", gameId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.currentHp").value(50))
-                .andExpect(jsonPath("$.deck", hasSize(1)));
+                .andExpect(jsonPath("$.deck", hasSize(2)));
     }
+
+    @Test
+    @DisplayName("존재하지 않는 게임의 진행 상황을 업데이트하면 404를 반환한다")
+    void updateProgress_notFound() throws Exception {
+        String requestJson = progressRequestJson(
+                50, 3, "BATTLE", "PLAYING", List.of(card("STRIKE", 1))
+        );
+
+        mockMvc.perform(put("/games/{gameId}/progress", 999_999L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("이미 종료된 게임의 진행 상황을 업데이트하려 하면 409를 반환한다")
+    void updateProgress_whenGameFinished_conflict() throws Exception {
+        Long gameId = createGameAndGetId();
+
+        // 먼저 게임을 CLEARED 상태로 종료시킨다
+        mockMvc.perform(put("/games/{gameId}/progress", gameId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(progressRequestJson(
+                                99, 10, "FINISHED", "CLEARED", List.of(card("STRIKE", 1))
+                        )))
+                .andExpect(status().isOk());
+
+        // 종료된 게임에 다시 진행 상황을 저장하려고 하면 실패해야 한다
+        mockMvc.perform(put("/games/{gameId}/progress", gameId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(progressRequestJson(
+                                80, 5, "BATTLE", "PLAYING", List.of(card("STRIKE", 1))
+                        )))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409));
+    }
+
+    // TODO ProgressRequest 제약 검증
 }
