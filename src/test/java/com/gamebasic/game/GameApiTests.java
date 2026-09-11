@@ -101,4 +101,76 @@ class GameApiTests {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").exists());
     }
+
+    @Test
+    @DisplayName("덱 리스트가 비어있으면 400을 반환한다")
+    void createGame_validationFail_emptyDeck() throws Exception {
+        String requestJson = """
+                {
+                  "playerName": "hero",
+                  "deck": []
+                }
+                """;
+
+        mockMvc.perform(
+                        post("/games")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(requestJson)
+                )
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").exists());
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {-1, 11})
+    @DisplayName("카드 획득 층이 0~10층을 벗어나면 400을 반환한다")
+    void createGame_validationFail_invalidCardFloor(int acquiredFloor) throws Exception {
+        String requestJson = """
+                {
+                  "playerName": "hero",
+                  "deck": [
+                    {
+                      "cardType": "STRIKE",
+                      "acquiredFloor": %s
+                    }
+                  ]
+                }
+                """.formatted(acquiredFloor);
+
+        mockMvc.perform(
+                        post("/games")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(requestJson)
+                )
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").exists());
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", " "})
+    @DisplayName("카드 타입이 null이거나 비어있으면 400을 반환한다")
+    void createGame_validationFail_invalidCardType(String cardType) throws Exception {
+        String cardTypeJson = objectMapper.writeValueAsString(cardType);
+
+        String requestJson = """
+                {
+                  "playerName": "hero",
+                  "deck": [
+                    {
+                      "cardType": %s,
+                      "acquiredFloor": 0
+                    }
+                  ]
+                }
+                """.formatted(cardTypeJson);
+
+        mockMvc.perform(
+                        post("/games")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(requestJson)
+                )
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").exists());
+    }
 }
