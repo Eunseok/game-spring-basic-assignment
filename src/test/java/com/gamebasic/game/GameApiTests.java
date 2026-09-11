@@ -78,7 +78,7 @@ class GameApiTests {
 
     private String renameRequestJson(String playerName) throws Exception {
         Map<String, Object> map = new HashMap<>();
-        map.put("playerName", playerName); 
+        map.put("playerName", playerName);
         return objectMapper.writeValueAsString(map);
     }
 
@@ -305,4 +305,28 @@ class GameApiTests {
                         .content(renameRequestJson("newName")))
                 .andExpect(status().isNotFound());
     }
+
+    // ------------------------------------------------------------
+    // DELETE /games/{id} - 게임 삭제
+    // ------------------------------------------------------------
+
+    @Test
+    @DisplayName("게임을 삭제하면 204를 반환하고 이후 조회 시 404가 된다")
+    void deleteGame_success() throws Exception {
+        Long gameId = createGameAndGetId();
+
+        mockMvc.perform(delete("/games/{gameId}", gameId))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/games/{gameId}", gameId))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 게임을 삭제하면 404를 반환한다")
+    void deleteGame_notFound() throws Exception {
+        mockMvc.perform(delete("/games/{gameId}", 999L))
+                .andExpect(status().isNotFound());
+    }
+
 }
