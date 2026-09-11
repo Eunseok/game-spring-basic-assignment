@@ -100,23 +100,25 @@ public class GameService {
         List<DeckCount> deckCounts = runCardRepository.countByGames(games);
 
         // #3 Mapping(Id, Game)
-        Map<Long, Game> gameMap = games.stream().collect(Collectors.toMap(Game::getId, Function.identity()));
+        Map<Long, DeckCount> deckCountMap = deckCounts.stream()
+                .collect(Collectors.toMap(DeckCount::getGameId, Function.identity()));
 
         // #4 응답 DTO 반환
-        return deckCounts.stream()
-                .map(deckCount -> {
-                    Game game = gameMap.get(deckCount.getGameId());
+        return games.stream()
+                .map(game -> {
+                    DeckCount deckCount = deckCountMap.get(game.getId());
+                    int deckSize = deckCount != null ? deckCount.getDeckSize().intValue() : 0;
                     return GameSummaryResponse.builder()
-                        .id(game.getId())
-                        .playerName(game.getPlayerName())
-                        .currentFloor(game.getCurrentFloor())
-                        .currentHp(game.getCurrentHp())
-                        .phase(String.valueOf(game.getPhase()))
-                        .status(String.valueOf(game.getStatus()))
-                        .deckSize(deckCount.getDeckSize().intValue())
-                        .createAt(game.getCreatedAt())
-                        .updateAt(game.getUpdateAt())
-                        .build();
+                            .id(game.getId())
+                            .playerName(game.getPlayerName())
+                            .currentFloor(game.getCurrentFloor())
+                            .currentHp(game.getCurrentHp())
+                            .phase(String.valueOf(game.getPhase()))
+                            .status(String.valueOf(game.getStatus()))
+                            .deckSize(deckSize)
+                            .createAt(game.getCreatedAt())
+                            .updateAt(game.getUpdateAt())
+                            .build();
                 })
                 .toList();
     }
