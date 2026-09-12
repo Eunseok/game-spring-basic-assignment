@@ -2,7 +2,7 @@
 
 > 내일배움캠프 게임서버 백엔드 부트캠프 **Spring 입문 과제** 제출용 프로젝트입니다.
 >
-> 원본 프로젝트인 [nhahan/crimson-citadel](https://nhahan.github.io/crimson-citadel/)를 포크하여, 비어 있던 백엔드 API 서버를 Spring Boot + Spring Data JPA + MySQL(Docker)로 구현했습니다.
+> 원본 프로젝트인 [f-api/game-spring-basic-assignment](https://github.com/f-api/game-spring-basic-assignment)를 포크하여, 비어 있던 백엔드 API 서버를 Spring Boot + Spring Data JPA + MySQL(Docker)로 구현했습니다.
 >
 > 본 README는 **배포를 목적으로 작성된 문서가 아니며**, 과제 제출 및 튜터 평가를 위해 구현 내용과 설계 의도를 정리한 문서입니다.
 
@@ -16,7 +16,7 @@
 | 과정 | 내일배움캠프 게임서버 백엔드 부트캠프 |  
 | 과제 | Spring 입문 — Crimson Citadel 백엔드 API 구현 |  
 | 제출 목적 | 과제 제출 및 튜터 코드 리뷰/평가 |  
-| 원본 저장소 | [nhahan/crimson-citadel](https://nhahan.github.io/crimson-citadel/) (Fork) |  
+| 원본 저장소 | [f-api/game-spring-basic-assignment](https://github.com/f-api/game-spring-basic-assignment) (Fork) |  
 
 ## 기술 스택
 
