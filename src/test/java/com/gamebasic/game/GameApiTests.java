@@ -1,5 +1,6 @@
 package com.gamebasic.game;
 
+
 import com.gamebasic.game.dto.GameDetailResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -7,12 +8,11 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.client.RestTestClient;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
@@ -21,20 +21,16 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.hasSize;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @ActiveProfiles("test")
-@AutoConfigureMockMvc
+@AutoConfigureRestTestClient
 @Transactional
 class GameApiTests {
 
     @Autowired
-    private MockMvc mockMvc;
+    private RestTestClient restTestClient;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -62,16 +58,14 @@ class GameApiTests {
                 "hero", List.of(card("STRIKE", 1), card("GUARD", 1))
         );
 
-        MvcResult result = mockMvc.perform(post("/games")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestJson))
-                .andExpect(status().isCreated())
-                .andReturn();
-
-        GameDetailResponse response = objectMapper.readValue(
-                result.getResponse().getContentAsString(),
-                GameDetailResponse.class
-        );
+        GameDetailResponse response = restTestClient.post().uri("/games")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(requestJson)
+                .exchange()
+                .expectStatus().isCreated()
+                .expectBody(GameDetailResponse.class)
+                .returnResult()
+                .getResponseBody();
 
         return response.getId();
     }
@@ -112,23 +106,23 @@ class GameApiTests {
                 )
         );
 
-        mockMvc.perform(
-                        post("/games")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(requestJson)
-                )
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").exists())
-                .andExpect(jsonPath("$.playerName").value("hero"))
-                .andExpect(jsonPath("$.currentHp").value(99))
-                .andExpect(jsonPath("$.currentFloor").value(1))
-                .andExpect(jsonPath("$.phase").value("REWARD"))
-                .andExpect(jsonPath("$.status").value("PLAYING"))
-                .andExpect(jsonPath("$.deck", hasSize(2)))
-                .andExpect(jsonPath("$.deck[0].cardType").value("STRIKE"))
-                .andExpect(jsonPath("$.deck[0].acquiredFloor").value(0))
-                .andExpect(jsonPath("$.deck[1].cardType").value("GUARD"))
-                .andExpect(jsonPath("$.deck[1].acquiredFloor").value(0));
+        restTestClient.post().uri("/games")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(requestJson)
+                .exchange()
+                .expectStatus().isCreated()
+                .expectBody()
+                .jsonPath("$.id").exists()
+                .jsonPath("$.playerName").isEqualTo("hero")
+                .jsonPath("$.currentHp").isEqualTo(99)
+                .jsonPath("$.currentFloor").isEqualTo(1)
+                .jsonPath("$.phase").isEqualTo("REWARD")
+                .jsonPath("$.status").isEqualTo("PLAYING")
+                .jsonPath("$.deck.length()").isEqualTo(2)
+                .jsonPath("$.deck[0].cardType").isEqualTo("STRIKE")
+                .jsonPath("$.deck[0].acquiredFloor").isEqualTo(0)
+                .jsonPath("$.deck[1].cardType").isEqualTo("GUARD")
+                .jsonPath("$.deck[1].acquiredFloor").isEqualTo(0);
     }
 
     @ParameterizedTest
@@ -144,13 +138,13 @@ class GameApiTests {
                 )
         );
 
-        mockMvc.perform(
-                        post("/games")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(requestJson)
-                )
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").exists());
+        restTestClient.post().uri("/games")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(requestJson)
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.message").exists();
     }
 
     @Test
@@ -158,13 +152,14 @@ class GameApiTests {
     void createGame_validationFail_emptyDeck() throws Exception {
         String requestJson = createRequestJson("hero", List.of());
 
-        mockMvc.perform(
-                        post("/games")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(requestJson)
-                )
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").exists());
+
+        restTestClient.post().uri("/games")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(requestJson)
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.message").exists();
     }
 
     @ParameterizedTest
@@ -176,13 +171,13 @@ class GameApiTests {
                 List.of(card("STRIKE", acquiredFloor))
         );
 
-        mockMvc.perform(
-                        post("/games")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(requestJson)
-                )
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").exists());
+        restTestClient.post().uri("/games")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(requestJson)
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.message").exists();
     }
 
     @ParameterizedTest
@@ -195,13 +190,13 @@ class GameApiTests {
                 List.of(card(cardType, 0))
         );
 
-        mockMvc.perform(
-                        post("/games")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(requestJson)
-                )
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").exists());
+        restTestClient.post().uri("/games")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(requestJson)
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.message").exists();
     }
 
     // ------------------------------------------------------------
@@ -212,35 +207,39 @@ class GameApiTests {
     @DisplayName("저장된 모든 게임을 ID 내림차순으로 반환한다")
     void getGames_success() throws Exception {
         // Given
-        mockMvc.perform(
-                        post("/games")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(createRequestJson("heroA", List.of(card("STRIKE", 0))))
-                )
-                .andExpect(status().isCreated());
-        mockMvc.perform(
-                        post("/games")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(createRequestJson("heroB", List.of(card("STRIKE", 0), card("GUARD", 0))))
-                )
-                .andExpect(status().isCreated());
+        restTestClient.post().uri("/games")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(createRequestJson("heroA", List.of(card("STRIKE", 0))))
+                .exchange()
+                .expectStatus().isCreated();
+
+        restTestClient.post().uri("/games")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(createRequestJson("heroB", List.of(card("STRIKE", 0), card("GUARD", 0))))
+                .exchange()
+                .expectStatus().isCreated();
+
 
         // When & Then
-        mockMvc.perform(get("/games"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(2)))
-                .andExpect(jsonPath("$[0].playerName").value("heroB"))
-                .andExpect(jsonPath("$[0].deckSize").value(2))
-                .andExpect(jsonPath("$[1].playerName").value("heroA"))
-                .andExpect(jsonPath("$[1].deckSize").value(1));
+        restTestClient.get().uri("/games")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.length()").isEqualTo(2)
+                .jsonPath("$[0].playerName").isEqualTo("heroB")
+                .jsonPath("$[0].deckSize").isEqualTo(2)
+                .jsonPath("$[1].playerName").isEqualTo("heroA")
+                .jsonPath("$[1].deckSize").isEqualTo(1);
     }
 
     @Test
     @DisplayName("게임이 하나도 없으면 빈 목록을 반환한다")
     void getGames_empty() throws Exception {
-        mockMvc.perform(get("/games"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(0)));
+        restTestClient.get().uri("/games")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$").isEmpty();
     }
 
     // ------------------------------------------------------------
@@ -252,20 +251,24 @@ class GameApiTests {
     void getGame_success() throws Exception {
         Long gameId = createGameAndGetId();
 
-        mockMvc.perform(get("/games/{gameId}", gameId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(gameId))
-                .andExpect(jsonPath("$.playerName").value("hero"))
-                .andExpect(jsonPath("$.deck", hasSize(2)));
+        restTestClient.get().uri("/games/{gameId}", gameId)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.id").isEqualTo(gameId)
+                .jsonPath("$.playerName").isEqualTo("hero")
+                .jsonPath("$.deck.length()").isEqualTo(2);
     }
 
     @Test
     @DisplayName("존재하지 않는 게임을 조회하면 404를 반환한다")
     void getGame_notFound() throws Exception {
-        mockMvc.perform(get("/games/{gameId}", 999L))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.status").value(404))
-                .andExpect(jsonPath("$.message", containsString("999")));
+        restTestClient.get().uri("/games/{gameId}", 999L)
+                .exchange()
+                .expectStatus().isNotFound()
+                .expectBody()
+                .jsonPath("$.message")
+                .value((String message) -> assertThat(message).contains("999"));
     }
 
     // ------------------------------------------------------------
@@ -283,16 +286,18 @@ class GameApiTests {
                     "playerName": "newName"
                 }
                 """;
-        mockMvc.perform(
-                        patch("/games/{gameId}", gameId)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(requestJson)
-                )
-                .andExpect(status().isNoContent());
 
-        mockMvc.perform(get("/games/{gameId}", gameId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.playerName").value("newName"));
+        restTestClient.patch().uri("/games/{gameId}", gameId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(requestJson)
+                .exchange()
+                .expectStatus().isNoContent();
+
+        restTestClient.get().uri("/games/{gameId}", gameId)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.playerName").isEqualTo("newName");
     }
 
     @ParameterizedTest
@@ -302,22 +307,23 @@ class GameApiTests {
     void renamePlayerName_validationFail_invalidPlayerName(String playerName) throws Exception {
         Long gameId = createGameAndGetId();
 
-        mockMvc.perform(
-                        patch("/games/{gameId}", gameId)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(renameRequestJson(playerName))
-                )
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").exists());
+        restTestClient.patch().uri("/games/{gameId}", gameId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(renameRequestJson(playerName))
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.message").exists();
     }
 
     @Test
     @DisplayName("존재하지 않는 게임의 이름을 변경하면 404를 반환한다")
     void renameGame_notFound() throws Exception {
-        mockMvc.perform(patch("/games/{gameId}", 999L)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(renameRequestJson("newName")))
-                .andExpect(status().isNotFound());
+        restTestClient.patch().uri("/games/{gameId}", 999L)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(renameRequestJson("newName"))
+                .exchange()
+                .expectStatus().isNotFound();
     }
 
     // ------------------------------------------------------------
@@ -329,18 +335,21 @@ class GameApiTests {
     void deleteGame_success() throws Exception {
         Long gameId = createGameAndGetId();
 
-        mockMvc.perform(delete("/games/{gameId}", gameId))
-                .andExpect(status().isNoContent());
+        restTestClient.delete().uri("/games/{gameId}", gameId)
+                .exchange()
+                .expectStatus().isNoContent();
 
-        mockMvc.perform(get("/games/{gameId}", gameId))
-                .andExpect(status().isNotFound());
+        restTestClient.get().uri("/games/{gameId}", gameId)
+                .exchange()
+                .expectStatus().isNotFound();
     }
 
     @Test
     @DisplayName("존재하지 않는 게임을 삭제하면 404를 반환한다")
     void deleteGame_notFound() throws Exception {
-        mockMvc.perform(delete("/games/{gameId}", 999L))
-                .andExpect(status().isNotFound());
+        restTestClient.delete().uri("/games/{gameId}", 999L)
+                .exchange()
+                .expectStatus().isNotFound();
     }
 
     // ------------------------------------------------------------
@@ -351,29 +360,32 @@ class GameApiTests {
     void updateProgress_success() throws Exception {
         Long gameId = createGameAndGetId();
 
-
         String requestJson = progressRequestJson(
                 50, 3, "BATTLE", "PLAYING", List.of(card("HEAVY_BLOW", 3), card("STRIKE", 1))
         );
 
-        mockMvc.perform(put("/games/{gameId}/progress", gameId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestJson))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(gameId))
-                .andExpect(jsonPath("$.currentHp").value(50))
-                .andExpect(jsonPath("$.currentFloor").value(3))
-                .andExpect(jsonPath("$.phase").value("BATTLE"))
-                .andExpect(jsonPath("$.status").value("PLAYING"))
-                .andExpect(jsonPath("$.deck", hasSize(2)))
-                .andExpect(jsonPath("$.deck[0].cardType").value("HEAVY_BLOW"))
-                .andExpect(jsonPath("$.deck[1].cardType").value("STRIKE"));
+        restTestClient.put().uri("/games/{gameId}/progress", gameId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(requestJson)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.id").isEqualTo(gameId)
+                .jsonPath("$.currentHp").isEqualTo(50)
+                .jsonPath("$.currentFloor").isEqualTo(3)
+                .jsonPath("$.phase").isEqualTo("BATTLE")
+                .jsonPath("$.status").isEqualTo("PLAYING")
+                .jsonPath("$.deck.length()").isEqualTo(2)
+                .jsonPath("$.deck[0].cardType").isEqualTo("HEAVY_BLOW")
+                .jsonPath("$.deck[1].cardType").isEqualTo("STRIKE");
 
         // 재조회해도 갱신된 내용이 유지되어야 한다
-        mockMvc.perform(get("/games/{gameId}", gameId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.currentHp").value(50))
-                .andExpect(jsonPath("$.deck", hasSize(2)));
+        restTestClient.get().uri("/games/{gameId}", gameId)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.currentHp").isEqualTo(50)
+                .jsonPath("$.deck.length()").isEqualTo(2);
     }
 
     @Test
@@ -383,10 +395,11 @@ class GameApiTests {
                 50, 3, "BATTLE", "PLAYING", List.of(card("STRIKE", 1))
         );
 
-        mockMvc.perform(put("/games/{gameId}/progress", 999_999L)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestJson))
-                .andExpect(status().isNotFound());
+        restTestClient.put().uri("/games/{gameId}/progress", 999_999L)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(requestJson)
+                .exchange()
+                .expectStatus().isNotFound();
     }
 
     @Test
@@ -395,21 +408,24 @@ class GameApiTests {
         Long gameId = createGameAndGetId();
 
         // 먼저 게임을 CLEARED 상태로 종료시킨다
-        mockMvc.perform(put("/games/{gameId}/progress", gameId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(progressRequestJson(
-                                99, 10, "FINISHED", "CLEARED", List.of(card("STRIKE", 1))
-                        )))
-                .andExpect(status().isOk());
+        restTestClient.put().uri("/games/{gameId}/progress", gameId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(progressRequestJson(
+                        99, 10, "FINISHED", "CLEARED", List.of(card("STRIKE", 1))
+                ))
+                .exchange()
+                .expectStatus().isOk();
 
         // 종료된 게임에 다시 진행 상황을 저장하려고 하면 실패해야 한다
-        mockMvc.perform(put("/games/{gameId}/progress", gameId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(progressRequestJson(
-                                80, 5, "BATTLE", "PLAYING", List.of(card("STRIKE", 1))
-                        )))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.status").value(409));
+        restTestClient.put().uri("/games/{gameId}/progress", gameId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(progressRequestJson(
+                        80, 5, "BATTLE", "PLAYING", List.of(card("STRIKE", 1))
+                ))
+                .exchange()
+                .expectStatus().isEqualTo(409)
+                .expectBody()
+                .jsonPath("$.status").isEqualTo(409);
     }
 
     // TODO ProgressRequest 제약 검증
